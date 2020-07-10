@@ -8,9 +8,11 @@ const client = new Discord.Client();
 client.login(process.env.TOKEN);
 
 // List of Game Boy and Super Game Boy 2 games
-// Filled in next two functions
+// Filled in future functions
 var games = [];
 
+// Verify time of last run checked
+var checkTime;
 
 // Convert times to a readable format
 const convert = time => {
@@ -28,6 +30,8 @@ const convert = time => {
 
 client.once('ready', async () => {
   console.log('ready');
+  // Set initial verify time
+  checkTime = new Date();
   // Discord status
   client.user.setActivity("PORTABLE POWER!");
   // Get all games with Game Boy platform
@@ -62,18 +66,23 @@ client.setInterval( async () => {
   const recentRunsResponse = await fetch(`https://www.speedrun.com/api/v1/runs?status=verified&orderby=verify-date&direction=desc&embed=game,category.variables,platform,players`);
   const recentRunsObject = await recentRunsResponse.json();
   const recentRuns = recentRunsObject.data;
-  // Get time of now
-  const now = new Date();
+  //TEST
+  console.log(checkTime);
+  let newCheckTime;
   for (let i = 0; i < recentRuns.length; i++) {
     const thisRun = recentRuns[i];
-    // Skip if the game is not in the games array
-    if (!games.includes(thisRun.game.data.id)) continue;
+    // Skip if the game is not in the games array or is a per-level category
+    if (!games.includes(thisRun.game.data.id) || thisRun.category.data.type === "per-level") continue;
     // When run was verified
-    const then = new Date(thisRun.status['verify-date']);
-    // If the run was verified over 30 seconds ago, quit
-    if (now - then > 3e4) return;
+    const verifyTime = new Date(thisRun.status['verify-date']);
+    if (i === 0) newCheckTime = verifyTime;
+    // If the run was before last first checked run, quit (but update time!)
+    if (verifyTime - checkTime <= 0) {
+      checkTime = newCheckTime;
+      return;
+    }
     // Get leaderboard of current run's game and category
-    const leaderboardResponse = await fetch(`https://www.speedrun.com/api/v1/leaderboards/${recentRuns[i].game.data.id}/category/${recentRuns[i].category.data.id}?top=1`);
+    const leaderboardResponse = await fetch(`https://www.speedrun.com/api/v1/leaderboards/${thisRun.game.data.id}/category/${thisRun.category.data.id}?top=1`);
     const leaderboardObject = await leaderboardResponse.json();
     const leaderboard = leaderboardObject.data;
     // If the run isn't 1st place, skip it
@@ -85,7 +94,7 @@ client.setInterval( async () => {
     const subCategoryObject = thisRun.category.data.variables.data.find(v => v['is-subcategory']);
     const subCategory = subCategoryObject === undefined ? '' : ' (' + subCategoryObject.name + ')';
     // Create Discord embed
-    const embed = new Discord.RichEmbed()
+    const embed = new Discord.MessageEmbed()
       .setColor('#80C86F')
       .setTitle(convert(thisRun.times.primary_t) + ' by ' + runnerName)
       .setThumbnail(thisRun.game.data.assets['cover-medium'].uri)
@@ -95,13 +104,16 @@ client.setInterval( async () => {
       .setTimestamp();
     // Create array of channels
     const serverFile = fs.readFileSync(path.join(__dirname, 'servers.json'));
-    let servers = JSON.parse(contents).servers;
+    let servers = JSON.parse(serverFile).servers;
     let channels = servers.map(s => s.channel);
+    // Message each of the channels
     for (let j = 0; j < channels.length; j++) {
-      const thisChannel = await client.channels.fetch(channels[i]);
+      const thisChannel = await client.channels.fetch(channels[j]);
       thisChannel.send(embed);
     }
   }
+  // Update the time to check
+  checkTime = newCheckTime;
 }, 3e4); // 30 seconds
 
 client.on('message', async message => {
