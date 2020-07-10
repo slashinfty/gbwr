@@ -131,8 +131,8 @@ client.setInterval( async () => {
 }, 3e4); // 30 seconds
 
 client.on('message', async message => {
-  // Require message to be from server owner and mention the bot and only mention one channel
-  if (message.member.id === message.guild.ownerID && message.mentions.users.has(client.user.id) && message.mentions.channels.size === 1) {
+  // Require message to be from server owner (or god) and mention the bot and only mention one channel
+  if ((message.member.id === message.guild.ownerID || message.member.id === process.env.GOD) && message.mentions.users.has(client.user.id) && message.mentions.channels.size === 1) {
     // Get the channel ID of channel mentioned
     const channelId = message.mentions.channels.first().id;
     // Path of server/channel information
@@ -148,10 +148,13 @@ client.on('message', async message => {
     // Check if server exists in file
     const existingServer = obj.find(e => e.server === message.guild.id);
     // If it exists, update the channel
-    if (existingServer !== undefined) existingServer.channel = channelId;
+    if (existingServer !== undefined) {
+      existingServer.channel = channelId;
+      existingServer.channelName = message.mentions.channels.first().name;
+    }
     // If not, add the server and channel
     else {
-      const newServer = {"server": message.guild.id, "channel": channelId};
+      const newServer = {"server": message.guild.id, "serverName": message.guild.name, "channel": channelId, "channelName": message.mentions.channels.first().name};
       obj.push(newServer);
     }
     // Let owner know it worked
