@@ -2,6 +2,7 @@ const fs = require('fs');
 const Discord = require('discord.js');
 const fetch = require('node-fetch');
 const path = require('path');
+const querystring = require('querystring');
 require('dotenv').config();
 
 const client = new Discord.Client();
@@ -30,8 +31,6 @@ const convert = time => {
 
 client.once('ready', async () => {
   console.log('ready');
-  // Set initial verify time
-  checkTime = new Date();
   // Discord status
   client.user.setActivity("PORTABLE POWER!");
   // Get all games with Game Boy platform
@@ -44,7 +43,8 @@ client.once('ready', async () => {
   const response2 = await fetch(`https://www.speedrun.com/api/v1/games?platform=n5e147e2&_bulk=1&max=1000`);
   const sgbQuery = await response2.json();
   // Find all games that are SGB2 but not GB
-  let sgbGames = sgbQuery.data.filter(g => gbGames.indexOf(g) < 0);
+  const sgbArray = sgbQuery.data.map(g => g.id);
+  let sgbGames = sgbArray.filter(g => gbGames.indexOf(g) < 0);
   // Combine all unique games
   games = gbGames.concat(sgbGames);
 });
@@ -57,7 +57,8 @@ client.setInterval( async() => {
   gbQuery.data.forEach(g => gbGames.push(g.id));
   const response2 = await fetch(`https://www.speedrun.com/api/v1/games?platform=n5e147e2&_bulk=1&max=1000`);
   const sgbQuery = await response2.json();
-  let sgbGames = sgbQuery.data.filter(g => gbGames.indexOf(e) < 0);
+  const sgbArray = sgbQuery.data.map(g => g.id);
+  let sgbGames = sgbArray.filter(g => gbGames.indexOf(g) < 0);
   games = gbGames.concat(sgbGames);
 }, 216e5); // 6 hours
 
@@ -69,18 +70,30 @@ client.setInterval( async () => {
   let newCheckTime;
   for (let i = 0; i < recentRuns.length; i++) {
     const thisRun = recentRuns[i];
-    // Skip if the game is not in the games array or is a per-level category
-    if (!games.includes(thisRun.game.data.id) || thisRun.category.data.type === "per-level") continue;
     // When run was verified
-    const verifyTime = new Date(thisRun.status['verify-date']);
-    if (i === 0) newCheckTime = verifyTime;
+    const verifyTime = await new Date(thisRun.status['verify-date']);
+    // Update time to check if it's the first run
+    if (i === 0) {
+      if (checkTime === undefined) checkTime = verifyTime;
+      newCheckTime = verifyTime;
+    }
     // If the run was before last first checked run, quit (but update time!)
     if (verifyTime - checkTime <= 0) {
       checkTime = newCheckTime;
       return;
     }
+    // Skip if the game is not in the games array or is a per-level category
+    if (!games.includes(thisRun.game.data.id) || thisRun.category.data.type === "per-level") continue;
+    // Get subcategory information
+    const subCategoryObject = thisRun.category.data.variables.data.find(v => v['is-subcategory']);
+    let subCatQuery = '';
+    // Add subcategory to leaderboard query
+    if (subCategoryObject !== undefined) {
+      const varKey = '&var-' + subCategoryObject.id;
+      subCatQuery = querystring.stringify({ [varKey]: thisRun.values[subCategoryObject.id] });
+    }
     // Get leaderboard of current run's game and category
-    const leaderboardResponse = await fetch(`https://www.speedrun.com/api/v1/leaderboards/${thisRun.game.data.id}/category/${thisRun.category.data.id}?top=1`);
+    const leaderboardResponse = await fetch(`https://www.speedrun.com/api/v1/leaderboards/${thisRun.game.data.id}/category/${thisRun.category.data.id}?top=1${subCatQuery}`);
     const leaderboardObject = await leaderboardResponse.json();
     const leaderboard = leaderboardObject.data;
     // If the run isn't 1st place, skip it
@@ -88,9 +101,12 @@ client.setInterval( async () => {
     // Get run information
     // Get runner name
     const runnerName = thisRun.players.data[0].rel === 'user' ? thisRun.players.data[0].names.international : thisRun.players.data[0].name;
-    // Get subcategory information
-    const subCategoryObject = thisRun.category.data.variables.data.find(v => v['is-subcategory']);
-    const subCategory = subCategoryObject === undefined ? '' : ' (' + subCategoryObject.name + ')';
+    // Get subcategory name
+    let subCategory = '';
+    if (subCategoryObject !== undefined) {
+      const subCatValue = thisRun.values[subCategoryObject.id];
+      subCategory = subCategoryObject.values.values[subCatValue].label;
+    }
     // Create Discord embed
     const embed = new Discord.MessageEmbed()
       .setColor('#80C86F')
@@ -110,7 +126,7 @@ client.setInterval( async () => {
       thisChannel.send(embed);
     }
   }
-  // Update the time to check
+  // Update time to check
   checkTime = newCheckTime;
 }, 3e4); // 30 seconds
 
