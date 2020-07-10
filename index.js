@@ -105,7 +105,7 @@ client.setInterval( async () => {
     let subCategory = '';
     if (subCategoryObject !== undefined) {
       const subCatValue = thisRun.values[subCategoryObject.id];
-      subCategory = subCategoryObject.values.values[subCatValue].label;
+      subCategory = ' (' + subCategoryObject.values.values[subCatValue].label + ')';
     }
     // Create Discord embed
     const embed = new Discord.MessageEmbed()
@@ -123,7 +123,7 @@ client.setInterval( async () => {
     // Message each of the channels
     for (let j = 0; j < channels.length; j++) {
       const thisChannel = await client.channels.fetch(channels[j]);
-      thisChannel.send(embed);
+      await thisChannel.send(embed).then(msg => checkTime = newCheckTime);
     }
   }
   // Update time to check
