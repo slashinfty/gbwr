@@ -66,8 +66,6 @@ client.setInterval( async () => {
   const recentRunsResponse = await fetch(`https://www.speedrun.com/api/v1/runs?status=verified&orderby=verify-date&direction=desc&embed=game,category.variables,platform,players`);
   const recentRunsObject = await recentRunsResponse.json();
   const recentRuns = recentRunsObject.data;
-  //TEST
-  console.log(checkTime);
   let newCheckTime;
   for (let i = 0; i < recentRuns.length; i++) {
     const thisRun = recentRuns[i];
