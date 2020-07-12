@@ -82,8 +82,10 @@ client.setInterval( async () => {
       checkTime = newCheckTime;
       return;
     }
-    // Skip if the game is not in the games array or is a per-level category
-    if (!games.includes(thisRun.game.data.id) || thisRun.category.data.type === "per-level") continue;
+    // Platforms: SGB, SGB2, GB, GBP, 3DSVC, GBI, GBA, GBC
+    const allowedPlatforms = ['n5683oev', 'n5e147e2', '7g6mx89r', '3167jd6q', '7m6yvw6p', 'vm9v3ne3', '3167d6q2', 'gde3g9k1'];
+    // Skip if the game is not in the games array or is a per-level category or is not a platform listed above
+    if (!games.includes(thisRun.game.data.id) || thisRun.category.data.type === "per-level" || !allowedPlatforms.includes(thisRun.system.platform)) continue;
     // Get subcategory information
     const subCategoryObject = thisRun.category.data.variables.data.find(v => v['is-subcategory']);
     let subCatQuery = '';
