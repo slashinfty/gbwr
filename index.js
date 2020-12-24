@@ -6,7 +6,7 @@ const querystring = require('querystring');
 require('dotenv').config();
 
 const client = new Discord.Client();
-client.login("NzMwNjQ5MTYwMjMwODk1NjI2.XwkkWQ.axsWQNA3SSWbq4dQsfoWo7-WbFs");
+client.login("");
 
 // List of Game Boy and Super Game Boy 2 games
 // Filled in future functions
